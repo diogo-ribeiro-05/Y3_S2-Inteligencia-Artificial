@@ -36,3 +36,57 @@ class HillClimbingSolver:
     def request_stop(self):
         """Request the solver to stop."""
         self._stop_requested = True
+
+    def _swap_slides(self, solution: Slideshow) -> Slideshow:
+        """Swap two random slides."""
+        if len(solution.slides) < 2:
+            return solution
+
+        new_slides = solution.slides.copy()
+        i, j = random.sample(range(len(new_slides)), 2)
+        new_slides[i], new_slides[j] = new_slides[j], new_slides[i]
+
+        return Slideshow(new_slides)
+
+    def get_neighbor(self, solution: Slideshow) -> Slideshow:
+        """Generate a neighbor solution."""
+        return self._swap_slides(solution)
+
+    def solve(
+        self,
+        max_iterations: int = 10000,
+        callback: Callable[[int, int], None] = None
+    ) -> Slideshow:
+        """
+        Run hill climbing optimization.
+
+        Args:
+            max_iterations: Maximum number of iterations
+            callback: Optional callback(iteration, score) for UI updates
+
+        Returns:
+            Best slideshow found
+        """
+        self._stop_requested = False
+        self.history = []
+
+        current = self.generate_initial_solution()
+        current_score = current.calculate_score()
+
+        for iteration in range(max_iterations):
+            if self._stop_requested:
+                break
+
+            neighbor = self.get_neighbor(current)
+            neighbor_score = neighbor.calculate_score()
+
+            if neighbor_score > current_score:
+                current = neighbor
+                current_score = neighbor_score
+
+            self.history.append(current_score)
+
+            if callback:
+                callback(iteration, current_score)
+
+        return current
