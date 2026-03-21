@@ -226,6 +226,51 @@ The solver supports a callback function that receives `(iteration, current_score
 - Callback every N iterations to update UI
 - Graph updates dynamically during execution
 
+## File Formats
+
+### Input Format
+```
+N                     # Number of photos
+O M tag1 tag2 ...     # Photo 0: O=orientation(H/V), M=number of tags, followed by M tags
+O M tag1 tag2 ...     # Photo 1
+...
+```
+
+Example:
+```
+4
+H 3 cat beach sun
+V 2 selfie smile
+V 2 garden selfie
+H 2 garden cat
+```
+
+- Line 1: 4 photos in collection
+- Photo 0: Horizontal, 3 tags [cat, beach, sun]
+- Photo 1: Vertical, 2 tags [selfie, smile]
+- Photo 2: Vertical, 2 tags [garden, selfie]
+- Photo 3: Horizontal, 2 tags [garden, cat]
+
+### Output Format (Submission)
+```
+S           # Number of slides
+id          # Slide with single horizontal photo
+id1 id2     # Slide with two vertical photos
+```
+
+Example:
+```
+3
+0
+3
+1 2
+```
+
+- 3 slides total
+- Slide 0: Photo 0 (horizontal)
+- Slide 1: Photo 3 (horizontal)
+- Slide 2: Photos 1 and 2 (vertical pair)
+
 ## Dependencies
 
 ```
