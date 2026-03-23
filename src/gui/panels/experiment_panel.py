@@ -4,6 +4,7 @@ import threading
 from typing import Optional
 from src.experiment.runner import ExperimentRunner, AlgorithmConfig, ExperimentResult
 from src.algorithms.registry import AlgorithmRegistry
+from src.algorithms.base import ParameterSchema
 from src.io.parser import parse_input
 from src.models.photo import Photo
 
@@ -20,6 +21,7 @@ class ExperimentPanel(ttk.Frame):
         self._photos: list[Photo] = []
         self._dataset_name: str = ""
         self._progress_labels: dict[str, ttk.Label] = {}
+        self._algo_param_widgets: dict[str, dict[str, tuple[tk.Widget, type]]] = {}
         self._setup_ui()
 
     def _setup_ui(self):
@@ -60,11 +62,11 @@ class ExperimentPanel(ttk.Frame):
         self.runs_entry = ttk.Entry(config_frame, textvariable=self.runs_var, width=10)
         self.runs_entry.pack(anchor="w", pady=(0, 5))
 
-        # Algorithm selection
-        algo_frame = ttk.LabelFrame(parent, text="Algorithms", padding=5)
+        # Algorithm selection with parameters
+        algo_frame = ttk.LabelFrame(parent, text="Algorithms & Parameters", padding=5)
         algo_frame.pack(fill="both", expand=True, pady=(0, 10))
 
-        # Scrollable frame for algorithm checkboxes
+        # Scrollable frame for algorithms
         canvas = tk.Canvas(algo_frame, highlightthickness=0)
         scrollbar = ttk.Scrollbar(algo_frame, orient="vertical", command=canvas.yview)
         self.algo_inner_frame = ttk.Frame(canvas)
@@ -80,14 +82,14 @@ class ExperimentPanel(ttk.Frame):
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Populate algorithm checkboxes
-        self._setup_algorithm_checkboxes()
+        # Populate algorithms with their parameters
+        self._setup_algorithm_sections()
 
         # Buttons
         btn_frame = ttk.Frame(parent)
         btn_frame.pack(fill="x")
 
-        self.run_btn = ttk.Button(btn_frame, text="Run", command=self._on_run)
+        self.run_btn = ttk.Button(btn_frame, text="Run Experiment", command=self._on_run)
         self.run_btn.pack(side="left", padx=2)
 
         self.stop_btn = ttk.Button(btn_frame, text="Stop", command=self._on_stop, state="disabled")
@@ -118,21 +120,86 @@ class ExperimentPanel(ttk.Frame):
         self.log_text = scrolledtext.ScrolledText(log_frame, height=15, state="disabled")
         self.log_text.pack(fill="both", expand=True)
 
-    def _setup_algorithm_checkboxes(self):
-        """Create checkboxes for all registered algorithms."""
+    def _setup_algorithm_sections(self):
+        """Create algorithm sections with checkboxes and parameter widgets."""
         self.algo_vars: dict[str, tk.BooleanVar] = {}
 
         for algo_name in AlgorithmRegistry.get_names():
+            algo_class = AlgorithmRegistry.get(algo_name)
+
+            # Create a frame for this algorithm
+            algo_section = ttk.Frame(self.algo_inner_frame)
+            algo_section.pack(fill="x", pady=5, padx=5)
+
+            # Checkbox for algorithm selection
             var = tk.BooleanVar(value=True)
             self.algo_vars[algo_name] = var
-            cb = ttk.Checkbutton(self.algo_inner_frame, text=algo_name, variable=var)
-            cb.pack(anchor="w", pady=1)
+            cb = ttk.Checkbutton(algo_section, text=algo_name, variable=var)
+            cb.pack(anchor="w")
 
-        # Also create progress labels for each algorithm
-        for algo_name in AlgorithmRegistry.get_names():
+            # Parameters frame (indented)
+            params_frame = ttk.Frame(algo_section)
+            params_frame.pack(fill="x", padx=(20, 0), pady=(2, 0))
+
+            # Create parameter widgets for this algorithm
+            self._algo_param_widgets[algo_name] = {}
+            for param in algo_class.parameters:
+                self._create_param_widget(params_frame, algo_name, param)
+
+            # Also create progress label for this algorithm
             label = ttk.Label(self.algo_progress_frame, text=f"{algo_name}: -")
             label.pack(anchor="w")
             self._progress_labels[algo_name] = label
+
+    def _create_param_widget(self, parent, algo_name: str, param: ParameterSchema):
+        """Create a widget for a single parameter."""
+        frame = ttk.Frame(parent)
+        frame.pack(fill="x", pady=2)
+
+        ttk.Label(frame, text=f"{param.name}:", width=15, anchor="w").pack(side="left")
+
+        if param.type == int:
+            widget = ttk.Spinbox(
+                frame,
+                from_=param.min_value or 0,
+                to=param.max_value or 999999,
+                width=10
+            )
+            widget.set(param.default)
+        elif param.type == float:
+            widget = ttk.Spinbox(
+                frame,
+                from_=param.min_value or 0,
+                to=param.max_value or 999999,
+                increment=0.01,
+                width=10
+            )
+            widget.set(param.default)
+        else:
+            widget = ttk.Entry(frame, width=12)
+            widget.insert(0, str(param.default))
+
+        widget.pack(side="left", padx=(5, 0))
+        self._algo_param_widgets[algo_name][param.name] = (widget, param.type)
+
+    def _get_algo_params(self, algo_name: str) -> dict:
+        """Get configured parameters for an algorithm."""
+        params = {}
+        if algo_name not in self._algo_param_widgets:
+            return params
+
+        for param_name, (widget, ptype) in self._algo_param_widgets[algo_name].items():
+            try:
+                value = widget.get()
+                params[param_name] = ptype(value)
+            except (ValueError, tk.TclError):
+                # Fall back to default from algorithm class
+                algo_class = AlgorithmRegistry.get(algo_name)
+                for param in algo_class.parameters:
+                    if param.name == param_name:
+                        params[param_name] = param.default
+                        break
+        return params
 
     def _load_dataset(self):
         """Open file dialog and create ExperimentRunner."""
@@ -153,14 +220,19 @@ class ExperimentPanel(ttk.Frame):
             self._log(f"Error loading dataset: {e}")
 
     def _on_run(self):
-        """Start experiment with all selected algorithms."""
+        """Start experiment with all selected algorithms and their parameters."""
         if not self._photos:
             self._log("Error: No dataset loaded")
             return
 
-        # Get selected algorithms
-        selected_algos = [name for name, var in self.algo_vars.items() if var.get()]
-        if not selected_algos:
+        # Get selected algorithms with their configured parameters
+        selected_configs = []
+        for algo_name, var in self.algo_vars.items():
+            if var.get():
+                params = self._get_algo_params(algo_name)
+                selected_configs.append(AlgorithmConfig(algo_name, params))
+
+        if not selected_configs:
             self._log("Error: No algorithms selected")
             return
 
@@ -173,9 +245,8 @@ class ExperimentPanel(ttk.Frame):
             self._log(f"Error: Invalid runs value - {e}")
             return
 
-        # Create experiment runner and configs
+        # Create experiment runner
         self._runner = ExperimentRunner(self._photos, self._dataset_name)
-        configs = [AlgorithmConfig(algo_name, {}) for algo_name in selected_algos]
 
         # Update UI state
         self._is_running = True
@@ -185,19 +256,22 @@ class ExperimentPanel(ttk.Frame):
 
         # Reset progress displays
         self.overall_progress_var.set(0)
-        for algo_name in selected_algos:
+        for algo_name in self.algo_vars:
             if algo_name in self._progress_labels:
                 self._progress_labels[algo_name].config(text=f"{algo_name}: 0 / {runs_per_algo}")
 
-        total_runs = len(selected_algos) * runs_per_algo
+        total_runs = len(selected_configs) * runs_per_algo
         self.overall_label.config(text=f"Overall: 0 / {total_runs} runs")
 
-        self._log(f"Starting experiment with {len(selected_algos)} algorithms, {runs_per_algo} runs each")
+        self._log(f"Starting experiment with {len(selected_configs)} algorithms, {runs_per_algo} runs each")
+        for config in selected_configs:
+            params_str = ", ".join(f"{k}={v}" for k, v in config.parameters.items())
+            self._log(f"  - {config.algorithm_name} ({params_str})")
 
         # Start experiment in background thread
         self._experiment_thread = threading.Thread(
             target=self._run_experiment_thread,
-            args=(configs, runs_per_algo),
+            args=(selected_configs, runs_per_algo),
             daemon=True
         )
         self._experiment_thread.start()
@@ -263,6 +337,7 @@ class ExperimentPanel(ttk.Frame):
 
         for summary in result.get_summary():
             self._log(f"{summary['algorithm']}:")
+            self._log(f"  Parameters: {summary['parameters']}")
             self._log(f"  Mean score: {summary['mean_score']:.2f} (+/- {summary['std_score']:.2f})")
             self._log(f"  Best score: {summary['best_score']}")
             self._log(f"  Worst score: {summary['worst_score']}")
