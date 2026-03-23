@@ -3,23 +3,9 @@ from src.algorithms.registry import AlgorithmRegistry
 from src.models.photo import Photo
 
 
-@AlgorithmRegistry.register
-class MockAlgorithm(BaseAlgorithm):
-    name = "Mock Algorithm"
-    parameters = []
-
-    def solve(self, photos, callback=None, **params):
-        return AlgorithmResult(
-            slideshow=None,
-            score=0,
-            execution_time=0.0,
-            history=[]
-        )
-
-
 def test_registry_register():
     # Clear registry for test isolation
-    AlgorithmRegistry._algorithms = {}
+    AlgorithmRegistry.clear()
 
     @AlgorithmRegistry.register
     class TestAlgo(BaseAlgorithm):
@@ -34,7 +20,7 @@ def test_registry_register():
 
 
 def test_registry_get_methods():
-    AlgorithmRegistry._algorithms = {}
+    AlgorithmRegistry.clear()
 
     @AlgorithmRegistry.register
     class Algo1(BaseAlgorithm):

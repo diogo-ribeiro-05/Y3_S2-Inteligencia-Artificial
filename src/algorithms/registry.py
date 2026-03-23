@@ -27,3 +27,8 @@ class AlgorithmRegistry:
     def get_names(cls) -> list[str]:
         """Return names of all registered algorithms."""
         return list(cls._algorithms.keys())
+
+    @classmethod
+    def clear(cls) -> None:
+        """Clear all registered algorithms. Useful for testing."""
+        cls._algorithms.clear()
