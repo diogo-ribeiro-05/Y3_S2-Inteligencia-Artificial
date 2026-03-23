@@ -2,7 +2,7 @@
 import random
 from src.models.photo import Photo
 from src.experiment.runner import ExperimentRunner, AlgorithmConfig, ExperimentResult
-from src.algorithms.hill_climbing import HillClimbingSolver  # Import to trigger registration
+from src.algorithms import HillClimbingSolver  # Import from package to ensure registration
 
 
 def test_algorithm_config_creation():

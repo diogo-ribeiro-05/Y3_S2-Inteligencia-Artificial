@@ -1,11 +1,12 @@
 from src.algorithms.base import BaseAlgorithm, ParameterSchema, AlgorithmResult
 from src.algorithms.registry import AlgorithmRegistry
+from src.algorithms import HillClimbingSolver  # Ensure HillClimbingSolver is registered
 from src.models.photo import Photo
 
 
 def test_registry_register():
-    # Clear registry for test isolation
-    AlgorithmRegistry.clear()
+    # Save existing algorithms
+    existing = AlgorithmRegistry._algorithms.copy()
 
     @AlgorithmRegistry.register
     class TestAlgo(BaseAlgorithm):
@@ -18,9 +19,13 @@ def test_registry_register():
     assert "Test Algo" in AlgorithmRegistry._algorithms
     assert AlgorithmRegistry._algorithms["Test Algo"] == TestAlgo
 
+    # Restore registry (remove test algo)
+    AlgorithmRegistry._algorithms = existing
+
 
 def test_registry_get_methods():
-    AlgorithmRegistry.clear()
+    # Save existing algorithms
+    existing = AlgorithmRegistry._algorithms.copy()
 
     @AlgorithmRegistry.register
     class Algo1(BaseAlgorithm):
@@ -39,5 +44,11 @@ def test_registry_get_methods():
     assert AlgorithmRegistry.get("Algo One") == Algo1
     assert AlgorithmRegistry.get("Algo Two") == Algo2
     assert AlgorithmRegistry.get("NonExistent") is None
-    assert len(AlgorithmRegistry.get_all()) == 2
-    assert set(AlgorithmRegistry.get_names()) == {"Algo One", "Algo Two"}
+    # Only check the two new algos exist
+    assert AlgorithmRegistry.get("Algo One") is not None
+    assert AlgorithmRegistry.get("Algo Two") is not None
+    assert "Algo One" in AlgorithmRegistry.get_names()
+    assert "Algo Two" in AlgorithmRegistry.get_names()
+
+    # Restore registry
+    AlgorithmRegistry._algorithms = existing
