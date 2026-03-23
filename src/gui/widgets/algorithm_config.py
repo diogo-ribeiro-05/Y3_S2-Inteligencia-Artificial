@@ -13,6 +13,8 @@ class AlgorithmConfigWidget(ttk.Frame):
         super().__init__(parent)
         self.on_algorithm_change = on_algorithm_change
         self._param_widgets: dict[str, tuple[tk.Widget, type]] = {}
+        self._param_schemas: dict[str, ParameterSchema] = {}
+        self._error_callback: Optional[Callable[[str, str, Exception], None]] = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -46,6 +48,7 @@ class AlgorithmConfigWidget(ttk.Frame):
         for widget in self.params_frame.winfo_children():
             widget.destroy()
         self._param_widgets.clear()
+        self._param_schemas.clear()
 
         for param in parameters:
             frame = ttk.Frame(self.params_frame)
@@ -74,13 +77,35 @@ class AlgorithmConfigWidget(ttk.Frame):
 
             widget.pack(fill="x")
             self._param_widgets[param.name] = (widget, param.type)
+            self._param_schemas[param.name] = param
+
+    def set_error_callback(self, callback: Callable[[str, str, Exception], None]):
+        """Set callback for handling parameter conversion errors.
+
+        Args:
+            callback: Function called as callback(param_name, invalid_value, exception)
+        """
+        self._error_callback = callback
 
     def get_config(self) -> dict:
-        """Return current configuration (algorithm + parameters)."""
+        """Return current configuration (algorithm + parameters).
+
+        If a parameter value cannot be converted to its target type,
+        returns the default value from the parameter schema.
+        """
         params = {}
         for name, (widget, ptype) in self._param_widgets.items():
             value = widget.get()
-            params[name] = ptype(value)
+            try:
+                params[name] = ptype(value)
+            except (ValueError, TypeError) as e:
+                # Get default value from schema
+                default = self._param_schemas[name].default
+                params[name] = default
+
+                # Notify error callback if set
+                if self._error_callback:
+                    self._error_callback(name, value, e)
 
         return {
             "algorithm_name": self.algo_combo.get(),
