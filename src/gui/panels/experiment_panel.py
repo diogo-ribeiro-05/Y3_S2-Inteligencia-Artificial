@@ -35,8 +35,10 @@ class ExperimentPanel(ttk.Frame):
         right_frame = ttk.Frame(paned)
         paned.add(right_frame, weight=1)
 
-        self._setup_left_panel(left_frame)
+        # Setup right panel FIRST (creates algo_progress_frame)
         self._setup_right_panel(right_frame)
+        # Then setup left panel (uses algo_progress_frame)
+        self._setup_left_panel(left_frame)
 
     def _setup_left_panel(self, parent):
         # Dataset section
