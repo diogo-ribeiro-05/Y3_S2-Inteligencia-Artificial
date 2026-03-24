@@ -66,8 +66,19 @@ class SlideshowViewer(ttk.Frame):
         self.tags_label = ttk.Label(self.details_frame, text="Tags: -")
         self.tags_label.pack(anchor="w")
 
-        self.transition_label = ttk.Label(self.details_frame, text="Transition: -")
+        self.transition_label = ttk.Label(self.details_frame, text="Transition: -", font=("Arial", 10, "bold"))
         self.transition_label.pack(anchor="w")
+
+        ttk.Separator(self.details_frame, orient="horizontal").pack(fill="x", pady=5)
+
+        self.common_label = ttk.Label(self.details_frame, text="S∩S: -", foreground="green")
+        self.common_label.pack(anchor="w")
+
+        self.s1_only_label = ttk.Label(self.details_frame, text="S-S: -", foreground="blue")
+        self.s1_only_label.pack(anchor="w")
+
+        self.s2_only_label = ttk.Label(self.details_frame, text="S-S: -", foreground="purple")
+        self.s2_only_label.pack(anchor="w")
 
     def _go_first(self):
         if self.current_page > 0:
@@ -144,13 +155,32 @@ class SlideshowViewer(ttk.Frame):
         tags_str = ", ".join(sorted(slide.tags))
         self.tags_label.config(text=f"Tags: [{tags_str}]")
 
-        # Show transition score to next slide
+        # Show transition score to next slide with interest factor breakdown
         if index < len(self.slideshow.slides) - 1:
             next_slide = self.slideshow.slides[index + 1]
             score = calculate_transition_score(slide, next_slide)
-            self.transition_label.config(text=f"Transition S{index}->S{index+1}: score = {score}")
+
+            # Calculate interest factor components
+            common = slide.tags & next_slide.tags
+            only_s1 = slide.tags - next_slide.tags
+            only_s2 = next_slide.tags - slide.tags
+
+            # Format the breakdown
+            common_str = ", ".join(sorted(common)) if common else "∅"
+            s1_str = ", ".join(sorted(only_s1)) if only_s1 else "∅"
+            s2_str = ", ".join(sorted(only_s2)) if only_s2 else "∅"
+
+            self.transition_label.config(
+                text=f"S{index}→S{index+1}: min({len(common)}, {len(only_s1)}, {len(only_s2)}) = {score}"
+            )
+            self.common_label.config(text=f"S{index}∩S{index+1} ({len(common)}): {common_str}")
+            self.s1_only_label.config(text=f"S{index}-S{index+1} ({len(only_s1)}): {s1_str}")
+            self.s2_only_label.config(text=f"S{index+1}-S{index} ({len(only_s2)}): {s2_str}")
         else:
             self.transition_label.config(text="Transition: (last slide)")
+            self.common_label.config(text="S∩S: -")
+            self.s1_only_label.config(text="S-S: -")
+            self.s2_only_label.config(text="S-S: -")
 
     def clear(self):
         """Clear the viewer."""
@@ -164,3 +194,6 @@ class SlideshowViewer(ttk.Frame):
         self.slide_count_label.config(text="(0 slides)")
         self.tags_label.config(text="Tags: -")
         self.transition_label.config(text="Transition: -")
+        self.common_label.config(text="S∩S: -")
+        self.s1_only_label.config(text="S-S: -")
+        self.s2_only_label.config(text="S-S: -")
