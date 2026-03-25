@@ -15,6 +15,7 @@ class ParameterSchema:
     min_value: Any = None
     max_value: Any = None
     description: str = ""
+    options: list[str] | None = None  # For str type: list of allowed values (dropdown)
 
 
 @dataclass

@@ -71,6 +71,21 @@ class AlgorithmConfigWidget(ttk.Frame):
                     increment=0.01,
                     value=param.default
                 )
+            elif param.type == bool:
+                var = tk.BooleanVar(value=param.default)
+                widget = ttk.Checkbutton(frame, variable=var)
+                widget.pack(fill="x")
+                # Store the variable instead of widget for bool
+                self._param_widgets[param.name] = (var, param.type)
+                self._param_schemas[param.name] = param
+                continue  # Skip the generic pack/store below
+            elif param.type == str and param.options:
+                widget = ttk.Combobox(
+                    frame,
+                    values=param.options,
+                    state="readonly"
+                )
+                widget.set(param.default)
             else:
                 widget = ttk.Entry(frame)
                 widget.insert(0, str(param.default))

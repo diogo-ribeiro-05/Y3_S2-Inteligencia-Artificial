@@ -99,6 +99,19 @@ class SimulatedAnnealingSolver(BaseAlgorithm):
             max_value=0.9999,
             description="Taxa de arrefecimento"
         ),
+        ParameterSchema(
+            name="use_restart",
+            type=bool,
+            default=True,
+            description="Reiniciar com nova solução se estagnar"
+        ),
+        ParameterSchema(
+            name="neighbor_strategy",
+            type=str,
+            default="swap",
+            options=["swap", "insert", "reverse", "random"],
+            description="Estratégia de geração de vizinhos"
+        ),
     ]
 
     def __init__(self):
@@ -118,6 +131,8 @@ class SimulatedAnnealingSolver(BaseAlgorithm):
         max_iterations = params.get("max_iterations", 10000)
         temperature = params.get("initial_temperature", 1000.0)
         cooling_rate = params.get("cooling_rate", 0.995)
+        use_restart = params.get("use_restart", True)
+        neighbor_strategy = params.get("neighbor_strategy", "swap")
 
         # Gerar solução inicial
         current = self._generate_initial_solution(photos)
@@ -210,6 +225,65 @@ O algoritmo aparece automaticamente:
 
 O decorator `@AlgorithmRegistry.register` faz toda a magia de registo automático.
 
+## Tipos de Parâmetros Suportados
+
+| Tipo | Widget na UI | Campos Relevantes | Exemplo |
+|------|-------------|-------------------|---------|
+| `int` | Spinbox | `min_value`, `max_value` | `type=int, min_value=1, max_value=1000` |
+| `float` | Spinbox | `min_value`, `max_value` | `type=float, min_value=0.0, max_value=1.0` |
+| `bool` | Checkbox | - | `type=bool, default=True` |
+| `str` + `options` | Dropdown | `options=["a", "b"]` | `type=str, options=["greedy", "random"]` |
+| `str` sem `options` | Caixa de texto | - | `type=str, default="output.txt"` |
+
+### Exemplos
+
+```python
+# Inteiro com limites
+ParameterSchema(
+    name="max_iterations",
+    type=int,
+    default=1000,
+    min_value=1,
+    max_value=100000,
+    description="Número máximo de iterações"
+)
+
+# Float com limites
+ParameterSchema(
+    name="learning_rate",
+    type=float,
+    default=0.01,
+    min_value=0.001,
+    max_value=1.0,
+    description="Taxa de aprendizagem"
+)
+
+# Booleano (checkbox)
+ParameterSchema(
+    name="use_cache",
+    type=bool,
+    default=True,
+    description="Ativar cache de cálculos"
+)
+
+# String com opções (dropdown)
+ParameterSchema(
+    name="strategy",
+    type=str,
+    default="balanced",
+    options=["greedy", "random", "balanced"],
+    description="Estratégia de seleção"
+)
+
+# String simples (caixa de texto)
+ParameterSchema(
+    name="output_prefix",
+    type=str,
+    default="result",
+    description="Prefixo dos ficheiros de output"
+)
+```
+
 ## Checklist para Novos Algoritmos
 
 - [ ] Criar classe que herda de `BaseAlgorithm`
@@ -237,11 +311,12 @@ BaseAlgorithm (abstract)
 
 ParameterSchema
 ├── name: str
-├── type: type (int, float, str)
+├── type: type (int, float, str, bool)
 ├── default: Any
-├── min_value: Any (optional)
-├── max_value: Any (optional)
-└── description: str
+├── min_value: Any (optional, para int/float)
+├── max_value: Any (optional, para int/float)
+├── description: str
+└── options: list[str] (optional, para str com dropdown)
 
 AlgorithmResult
 ├── slideshow: Slideshow
